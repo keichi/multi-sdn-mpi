@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+service SDNMPI {
+    rpc ListJob(Empty) returns (ListJobResponse) {}
+    rpc GetJob(GetJobRequest) returns (GetJobResponse) {}
+    rpc CreateJob(CreateJobRequest) returns (Empty) {}
+    rpc StartJob(StartJobRequest) returns (Empty) {}
+    rpc FinishJob(FinishJobRequest) returns (Empty) {}
+
+    rpc ListProcess(ListProcessRequest) returns (ListProcessResponse) {}
+    rpc GetProcess(GetProcessRequest) returns (GetProcessResponse) {}
+    rpc CreateProcess(CreateProcessRequest) returns (Empty) {}
+    rpc StartProcess(StartProcessRequest) returns (Empty) {}
+    rpc FinishProcess(FinishProcessRequest) returns (Empty) {}
+}
+
+message Empty {
+}
+
+enum JobState {
+    JOB_PENDING = 0;
+    JOB_RUNNING = 1;
+    JOB_COMPLETE = 2;
+}
+
+message Job {
+    uint32 id = 1;
+    string name = 2;
+    uint32 uid = 3;
+    uint32 gid = 4;
+    string comm_pattern = 5;
+    uint32 n_tasks = 6;
+    JobState state = 7;
+}
+
+enum ProcessState {
+    PROCESS_PENDING = 0;
+    PROCESS_RUNNING = 1;
+    PROCESS_COMPLETE = 2;
+}
+
+message Process {
+    uint32 job_id = 1;
+    uint32 rank = 2;
+    uint32 node_id = 3;
+    string node_name = 4;
+    ProcessState state = 5;
+}
+
+message ListJobResponse {
+    repeated Job jobs = 1;
+}
+
+message GetJobRequest {
+    uint32 id = 1;
+}
+
+message GetJobResponse {
+    Job job = 1;
+}
+
+message CreateJobRequest {
+    Job job = 1;
+}
+
+message StartJobRequest {
+    uint32 id = 1;
+}
+
+message FinishJobRequest {
+    uint32 id = 1;
+}
+
+message ListProcessRequest {
+    uint32 job_id = 1;
+}
+
+message ListProcessResponse {
+    repeated Process processes = 1;
+}
+
+message GetProcessRequest {
+    uint32 job_id = 1;
+    uint32 rank = 2;
+}
+
+message GetProcessResponse {
+    Process process = 1;
+}
+
+message CreateProcessRequest {
+    Process process = 1;
+}
+
+message StartProcessRequest {
+    uint32 job_id = 1;
+    uint32 rank = 2;
+}
+
+message FinishProcessRequest {
+    uint32 job_id = 1;
+    uint32 rank = 2;
+}
