@@ -1,9 +1,9 @@
-import logging
+from logging import getLogger
 
 from . import sdnmpi_pb2, sdnmpi_pb2_grpc
 from .models import Job, JobState, Process, ProcessState
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
@@ -48,6 +48,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.job.state
         )
 
+        logger.info("Job %d created", request.id)
+
         return sdnmpi_pb2.Empty()
 
     def StartJob(self, request, context):
@@ -55,7 +57,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         job.state = JobState.RUNNING.value
         job.save()
 
-        logger.info("Started job %d", request.id)
+        logger.info("Job %d started", request.id)
 
         return sdnmpi_pb2.Empty()
 
@@ -63,6 +65,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         job = Job.get_by_id(request.id)
         job.state = JobState.COMPLETE.value
         job.save()
+
+        logger.info("Job %d finished", request.id)
 
         return sdnmpi_pb2.Empty()
 
@@ -104,6 +108,9 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.process.state
         )
 
+        logger.info("Process %d of job %d created", request.rank,
+                    request.job_id)
+
         return sdnmpi_pb2.Empty()
 
     def StartProcess(self, request, context):
@@ -112,6 +119,9 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         process.state = ProcessState.RUNNING.value
         process.save()
 
+        logger.info("Process %d of job %d started", request.rank,
+                    request.job_id)
+
         return sdnmpi_pb2.Empty()
 
     def FinishProcess(self, request, context):
@@ -119,5 +129,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
                               Process.rank == request.rank)
         process.state = ProcessState.COMPLETE.value
         process.save()
+
+        logger.info("Process %d of job %d finished", request.rank,
+                    request.job_id)
 
         return sdnmpi_pb2.Empty()

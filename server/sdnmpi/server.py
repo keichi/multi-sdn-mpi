@@ -9,6 +9,7 @@ from .sdnmpi_pb2_grpc import add_SDNMPIServicer_to_server
 from .servicer import SDNMPIServicer
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
+GRPC_SERVER_ADDRESS = "0.0.0.0:50051"
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,10 @@ logger = logging.getLogger(__name__)
 def serve():
     server = grpc.server(ThreadPoolExecutor(max_workers=10))
     add_SDNMPIServicer_to_server(SDNMPIServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port(GRPC_SERVER_ADDRESS)
     server.start()
+
+    logger.info("Server started at %s", GRPC_SERVER_ADDRESS)
 
     try:
         while True:
