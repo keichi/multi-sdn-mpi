@@ -1,9 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import os
+import sys
 import time
 
 import colorlog
 import grpc
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from .sdnmpi_pb2_grpc import add_SDNMPIServicer_to_server
 from .servicer import SDNMPIServicer
