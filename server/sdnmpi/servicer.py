@@ -48,7 +48,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.job.state
         )
 
-        logger.info("Job %d created", request.id)
+        logger.info("Job %d created", request.job.id)
 
         return sdnmpi_pb2.Empty()
 
@@ -108,8 +108,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.process.state
         )
 
-        logger.info("Process %d of job %d created", request.rank,
-                    request.job_id)
+        logger.info("Process %d of job %d created", request.process.rank,
+                    request.process.job_id)
 
         return sdnmpi_pb2.Empty()
 
