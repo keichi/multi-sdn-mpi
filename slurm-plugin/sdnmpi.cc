@@ -16,7 +16,22 @@ extern "C" {
 /* Job step ID of external process container */
 #define SLURM_EXTERN_CONT  (0xffffffff)
 
+#define SPANK_OPTION_KEY "SLURM_SPANK__SLURM_SPANK_OPTION_sdnmpi_comm_pattern"
+
 #include <slurm/spank.h>
+
+static struct spank_option opt = {
+    "comm-pattern", "[id]",
+    "specify the communication pattern id of this job.",
+    1, 0, NULL
+};
+
+int slurm_spank_init(spank_t spank, int argc, char *argv[])
+{
+    spank_option_register(spank, &opt);
+
+    return ESPANK_SUCCESS;
+}
 
 int slurm_spank_local_user_init(spank_t spank, int argc, char *argv[])
 {
@@ -32,6 +47,13 @@ int slurm_spank_local_user_init(spank_t spank, int argc, char *argv[])
 
     char *job_name;
     job_name = std::getenv("SLURM_JOB_NAME");
+
+    char *comm_pattern;
+    spank_option_getopt(spank, &opt, &comm_pattern);
+
+    if (!comm_pattern) {
+        comm_pattern = std::getenv(SPANK_OPTION_KEY);
+    }
 
     const auto cred = grpc::InsecureChannelCredentials();
     const auto chan = grpc::CreateChannel("192.168.69.100:50051", cred);
@@ -49,6 +71,10 @@ int slurm_spank_local_user_init(spank_t spank, int argc, char *argv[])
         job->set_gid(gid);
         job->set_n_tasks(n_tasks);
         job->set_state(JOB_PENDING);
+
+        if (comm_pattern) {
+            job->set_comm_pattern(comm_pattern);
+        }
 
         stub->CreateJob(&context, request, &response);
     }
