@@ -49,3 +49,27 @@ class Process(BaseModel):
         indexes = (
             (("job", "rank"), True),
         )
+
+
+class CommPattern(BaseModel):
+    name = CharField(index=True)
+
+    class Meta:
+        table_name = "comm_pattern"
+
+
+class CommPair(BaseModel):
+    pattern = ForeignKeyField(CommPattern, backref="pairs")
+    src = IntegerField()
+    dst = IntegerField()
+    tx_bytes = IntegerField()
+    rx_bytes = IntegerField()
+    tx_messages = IntegerField()
+    rx_messages = IntegerField()
+
+    class Meta:
+        table_name = "comm_pair"
+
+        indexes = (
+            (("pattern", "src", "dst"), True),
+        )

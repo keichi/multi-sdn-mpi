@@ -1,12 +1,74 @@
-from .models import db, Job, Process
+import json
+import tarfile
+
+from .models import CommPair, CommPattern, Job, Process, db
 
 
 MODELS = [
     Job,
-    Process
+    Process,
+    CommPattern,
+    CommPair
+]
+
+PATTERN_NAMES = [
+    "cg-c-128",
+    "ft-c-128",
+    "milc-128",
+    "openfoam-cavity-160",
+    "openfoam-dambreak-160"
 ]
 
 
-if __name__ == "__main__":
+def _load_json(f, pattern):
+    trace = json.loads(f.read().decode("utf-8"))
+
+    n_procs = trace["n_procs"]
+    src = trace["rank"]
+
+    for dst in range(n_procs):
+        tx_messages = trace["tx_messages"][dst]
+        rx_messages = trace["rx_messages"][dst]
+        tx_bytes = trace["tx_bytes"][dst]
+        rx_bytes = trace["rx_bytes"][dst]
+
+        if tx_messages == 0 and rx_messages == 0:
+            continue
+
+        CommPair.create(
+            pattern=pattern,
+            src=src,
+            dst=dst,
+            tx_bytes=tx_bytes,
+            rx_bytes=rx_bytes,
+            tx_messages=tx_messages,
+            rx_messages=rx_messages
+        )
+
+
+def _load_tarball(f, pattern):
+    with tarfile.open(fileobj=f, mode="r:*") as tar:
+        for member in tar.getmembers():
+            if not member.isfile() or not member.name.endswith(".json"):
+                continue
+
+            with tar.extractfile(member) as f:
+                _load_json(f, pattern)
+
+
+def _load_fixtures():
+    for name in PATTERN_NAMES:
+        pattern = CommPattern.create(name=name)
+
+        with open("fixtures/" + name + ".tar.gz", "rb") as f:
+            _load_tarball(f, pattern)
+
+
+def main():
     with db:
         db.create_tables(MODELS)
+        _load_fixtures()
+
+
+if __name__ == "__main__":
+    main()
