@@ -7,6 +7,7 @@ import requests
 
 
 RYU_API_URL = "http://localhost:8080"
+MIN_PRIO = 32768
 
 logger = getLogger(__name__)
 
@@ -34,7 +35,8 @@ class InterconnectManager:
                 out_port = self._get_port(u, v)
 
                 self._install_unicast_flow(dpid, src_mac, dst_mac, out_port,
-                                           cookie=cookie, priority=100)
+                                           cookie=cookie,
+                                           priority=MIN_PRIO + 100)
 
     def cleanup_for_job(self, job_id):
         cookie = job_id
@@ -72,7 +74,7 @@ class InterconnectManager:
         for switch in self.switches:
             dpid = self._get_dpid(switch)
             self._install_bcast_flow(dpid)
-        logger.info("Installed flooding flows")
+        logger.info("Installed flows for flooding bcast packets")
 
         # Compute links that must be blocked to remove loops
         g = networkx.Graph(self.graph)
@@ -90,7 +92,7 @@ class InterconnectManager:
             port = self._get_port(v, u)
 
             self._install_bcast_block_flow(dpid, port)
-        logger.info("Installed drop flows for removing loops")
+        logger.info("Installed flows for removing loops")
 
     def _clear_flows(self, dpid):
         requests.delete(RYU_API_URL + "/stats/flowentry/clear/" + str(dpid))
@@ -113,10 +115,12 @@ class InterconnectManager:
             "dpid": dpid,
             "cookie": cookie
         }
-        requests.post(RYU_API_URL + "/stats/flowentry/delete", json=payload)
+        r = requests.post(RYU_API_URL + "/stats/flowentry/delete_strict",
+                          json=payload)
+        r.raise_for_status()
 
     def _install_unicast_flow(self, dpid, src_mac, dst_mac, out_port,
-                              cookie=None, priority=None):
+                              cookie=None, priority=MIN_PRIO):
         payload = {
             "dpid": dpid,
             "match": {
@@ -137,7 +141,8 @@ class InterconnectManager:
         if priority:
             payload["priority"] = priority
 
-        requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r = requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r.raise_for_status()
 
     def _install_bcast_flow(self, dpid):
         payload = {
@@ -153,7 +158,8 @@ class InterconnectManager:
             ]
         }
 
-        requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r = requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r.raise_for_status()
 
     def _install_bcast_block_flow(self, dpid, in_port):
         payload = {
@@ -165,7 +171,8 @@ class InterconnectManager:
             "actions": []
         }
 
-        requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r = requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
+        r.raise_for_status()
 
     def _get_dpid(self, switch):
         return self.graph.nodes[switch]["dpid"]
