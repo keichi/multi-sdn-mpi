@@ -54,7 +54,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             gid=request.job.gid,
             comm_pattern=request.job.comm_pattern,
             n_tasks=request.job.n_tasks,
-            n_running=0,
+            n_started=0,
+            n_exited=0,
             state=request.job.state
         )
 
@@ -127,7 +128,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
         return sdnmpi_pb2.Empty()
 
-    def _reconfigure_interconnect(self, job_id):
+    def _prepare_interconnect(self, job_id):
         logger.info("Preparing interconnect for job %d", job_id)
 
         job = Job.get_by_id(job_id)
@@ -142,6 +143,12 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         # TODO ジョブとフローの対応関係を保存する必要あり (cookie?)
         # TODO ジョブとリンク負荷の対応関係を保存する必要あり
 
+        logger.info("Prepared interconnect for job %d", job_id)
+
+    def _cleanup_interconnect(self, job_id):
+        logger.info("Cleaning up interconnect for job %d", job_id)
+        logger.info("Cleaned up interconnect for job %d", job_id)
+
     def StartProcess(self, request, context):
         with db.atomic():
             process = Process.get(Process.job_id == request.job_id and
@@ -149,25 +156,37 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             process.state = ProcessState.RUNNING.value
             process.save()
 
-            job = Job.get_by_id(request.job_id)
-            job.n_running += 1
-            job.save()
+            Job.update(n_started=Job.n_started + 1) \
+               .where(id == request.job_id) \
+               .execute()
+
+        job = Job.get_by_id(request.job_id)
 
         logger.info("Process %d of job %d started", request.rank,
                     request.job_id)
 
-        if job.n_tasks == job.n_running:
-            self._reconfigure_interconnect(request.job_id)
+        if job.n_started == job.n_tasks:
+            self._prepare_interconnect(request.job_id)
 
         return sdnmpi_pb2.Empty()
 
     def FinishProcess(self, request, context):
-        process = Process.get(Process.job_id == request.job_id and
-                              Process.rank == request.rank)
-        process.state = ProcessState.COMPLETE.value
-        process.save()
+        with db.atomic():
+            process = Process.get(Process.job_id == request.job_id and
+                                  Process.rank == request.rank)
+            process.state = ProcessState.COMPLETE.value
+            process.save()
+
+            Job.update(n_exited=Job.n_exited + 1) \
+               .where(id == request.job_id) \
+               .execute()
+
+        job = Job.get_by_id(request.job_id)
 
         logger.info("Process %d of job %d exited", request.rank,
                     request.job_id)
+
+        if job.n_exited == job.n_tasks:
+            self._cleanup_interconnect(request.job_id)
 
         return sdnmpi_pb2.Empty()

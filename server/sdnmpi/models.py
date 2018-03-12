@@ -23,7 +23,8 @@ class Job(BaseModel):
     comm_pattern = CharField()
     name = CharField()
     n_tasks = IntegerField()
-    n_running = IntegerField(default=0)
+    n_started = IntegerField(default=0)
+    n_exited = IntegerField(default=0)
     state = IntegerField(default=JobState.PENDING.value)
 
     class Meta:

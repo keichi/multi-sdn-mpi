@@ -1,10 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import colorlog
+
 import grpc
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +27,7 @@ def serve():
     server.add_insecure_port(GRPC_SERVER_ADDRESS)
     server.start()
 
-    logger.info("Server started at %s", GRPC_SERVER_ADDRESS)
+    logger.info("gRPC server started on %s", GRPC_SERVER_ADDRESS)
 
     try:
         while True:
