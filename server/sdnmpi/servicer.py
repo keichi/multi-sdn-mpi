@@ -1,3 +1,4 @@
+from itertools import product
 from logging import getLogger
 
 import networkx
@@ -121,32 +122,34 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.process.state
         )
 
-        logger.info("Process %d of job %d created (node id: %d, node name: "
-                    "%s)",
-                    request.process.rank, request.process.job_id,
-                    request.process.node_id, request.process.node_name)
+        logger.debug("Process %d of job %d created (node id: %d, node name: "
+                     "%s)",
+                     request.process.rank, request.process.job_id,
+                     request.process.node_id, request.process.node_name)
 
         return sdnmpi_pb2.Empty()
 
     def _prepare_interconnect(self, job_id):
         logger.info("Preparing interconnect for job %d", job_id)
 
-        job = Job.get_by_id(job_id)
         procs = Process.select().where(Process.job_id == job_id)
 
-        # 通信パターンの読み込み
-        # プロセス配置の取得
-        # 経路割当計算
-        # フローエントリ生成
-        # フローエントリ送信
+        hosts = {proc.node_name for proc in procs}
+        paths = {}
 
-        # TODO ジョブとフローの対応関係を保存する必要あり (cookie?)
-        # TODO ジョブとリンク負荷の対応関係を保存する必要あり
+        for (src, dst) in product(hosts, hosts):
+            path = networkx.shortest_path(self.graph, src, dst)
+            paths[(src, dst)] = path
+
+        self.im.prepare_for_job(job_id, paths)
 
         logger.info("Prepared interconnect for job %d", job_id)
 
     def _cleanup_interconnect(self, job_id):
         logger.info("Cleaning up interconnect for job %d", job_id)
+
+        self.im.cleanup_for_job(job_id)
+
         logger.info("Cleaned up interconnect for job %d", job_id)
 
     def StartProcess(self, request, context):
@@ -162,8 +165,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
         job = Job.get_by_id(request.job_id)
 
-        logger.info("Process %d of job %d started", request.rank,
-                    request.job_id)
+        logger.debug("Process %d of job %d started", request.rank,
+                     request.job_id)
 
         if job.n_started == job.n_tasks:
             self._prepare_interconnect(request.job_id)
@@ -183,8 +186,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
         job = Job.get_by_id(request.job_id)
 
-        logger.info("Process %d of job %d exited", request.rank,
-                    request.job_id)
+        logger.debug("Process %d of job %d exited", request.rank,
+                     request.job_id)
 
         if job.n_exited == job.n_tasks:
             self._cleanup_interconnect(request.job_id)

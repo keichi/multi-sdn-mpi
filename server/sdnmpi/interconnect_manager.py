@@ -19,6 +19,32 @@ class InterconnectManager:
         self.switches = [n for n, d in graph.nodes.items()
                          if d["typ"] == "switch"]
 
+    def prepare_for_job(self, job_id, paths):
+        cookie = job_id
+
+        for (src, dst), path in paths.items():
+            if src == dst:
+                continue
+
+            src_mac = self._get_mac(src)
+            dst_mac = self._get_mac(dst)
+
+            for u, v in zip(path[1:-1], path[2:]):
+                dpid = self._get_dpid(u)
+                out_port = self._get_port(u, v)
+
+                self._install_unicast_flow(dpid, src_mac, dst_mac, out_port,
+                                           cookie=cookie, priority=100)
+
+    def cleanup_for_job(self, job_id):
+        cookie = job_id
+
+        for switch in self.switches:
+            dpid = self._get_dpid(switch)
+
+            self._query_flow_stats(dpid, cookie)
+            self._remove_unicast_flows(dpid, cookie)
+
     def startup(self):
         # Clear flow tables
         for switch in self.switches:
@@ -69,7 +95,28 @@ class InterconnectManager:
     def _clear_flows(self, dpid):
         requests.delete(RYU_API_URL + "/stats/flowentry/clear/" + str(dpid))
 
-    def _install_unicast_flow(self, dpid, src_mac, dst_mac, out_port):
+    def _query_flow_stats(self, dpid, cookie):
+        payload = {
+            "cookie": cookie
+        }
+        r = requests.post(RYU_API_URL + "/stats/aggregateflow/" + str(dpid),
+                          json=payload)
+
+        stats = r.json()[str(dpid)][0]
+
+        logger.info("Job %d consumed %d packets, %d bytes, %d flows"
+                    " on datapath %d", cookie, stats["packet_count"],
+                    stats["byte_count"], stats["flow_count"], dpid)
+
+    def _remove_unicast_flows(self, dpid, cookie):
+        payload = {
+            "dpid": dpid,
+            "cookie": cookie
+        }
+        requests.post(RYU_API_URL + "/stats/flowentry/delete", json=payload)
+
+    def _install_unicast_flow(self, dpid, src_mac, dst_mac, out_port,
+                              cookie=None, priority=None):
         payload = {
             "dpid": dpid,
             "match": {
@@ -83,6 +130,12 @@ class InterconnectManager:
                 }
             ]
         }
+
+        if cookie:
+            payload["cookie"] = cookie
+
+        if priority:
+            payload["priority"] = priority
 
         requests.post(RYU_API_URL + "/stats/flowentry/add", json=payload)
 
