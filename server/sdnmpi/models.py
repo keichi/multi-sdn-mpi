@@ -18,13 +18,16 @@ class JobState(Enum):
 
 
 class Job(BaseModel):
-    id = IntegerField(primary_key=True)
     uid = IntegerField()
     gid = IntegerField()
     comm_pattern = CharField()
     name = CharField()
     n_tasks = IntegerField()
-    state = IntegerField()
+    n_running = IntegerField(default=0)
+    state = IntegerField(default=JobState.PENDING.value)
+
+    class Meta:
+        table_name = "job"
 
 
 class ProcessState(Enum):
@@ -34,14 +37,14 @@ class ProcessState(Enum):
 
 
 class Process(BaseModel):
-    id = IntegerField(primary_key=True)
     job = ForeignKeyField(Job, backref="processes")
     rank = IntegerField()
     node_id = IntegerField()
     node_name = CharField()
-    state = IntegerField()
+    state = IntegerField(default=ProcessState.PENDING.value)
 
     class Meta:
+        table_name = "process"
         indexes = (
             (("job", "rank"), True),
         )

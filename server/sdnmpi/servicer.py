@@ -54,6 +54,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             gid=request.job.gid,
             comm_pattern=request.job.comm_pattern,
             n_tasks=request.job.n_tasks,
+            n_running=0,
             state=request.job.state
         )
 
@@ -77,7 +78,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         job.state = JobState.COMPLETE.value
         job.save()
 
-        logger.info("Job %d finished", request.id)
+        logger.info("Job %d completed", request.id)
 
         return sdnmpi_pb2.Empty()
 
@@ -119,20 +120,44 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             state=request.process.state
         )
 
-        logger.info("Process %d of job %d created (node id: %d, node name: %s)",
+        logger.info("Process %d of job %d created (node id: %d, node name: "
+                    "%s)",
                     request.process.rank, request.process.job_id,
                     request.process.node_id, request.process.node_name)
 
         return sdnmpi_pb2.Empty()
 
+    def _reconfigure_interconnect(self, job_id):
+        logger.info("Preparing interconnect for job %d", job_id)
+
+        job = Job.get_by_id(job_id)
+        procs = Process.select().where(Process.job_id == job_id)
+
+        # 通信パターンの読み込み
+        # プロセス配置の取得
+        # 経路割当計算
+        # フローエントリ生成
+        # フローエントリ送信
+
+        # TODO ジョブとフローの対応関係を保存する必要あり (cookie?)
+        # TODO ジョブとリンク負荷の対応関係を保存する必要あり
+
     def StartProcess(self, request, context):
-        process = Process.get(Process.job_id == request.job_id and
-                              Process.rank == request.rank)
-        process.state = ProcessState.RUNNING.value
-        process.save()
+        with db.atomic():
+            process = Process.get(Process.job_id == request.job_id and
+                                  Process.rank == request.rank)
+            process.state = ProcessState.RUNNING.value
+            process.save()
+
+            job = Job.get_by_id(request.job_id)
+            job.n_running += 1
+            job.save()
 
         logger.info("Process %d of job %d started", request.rank,
                     request.job_id)
+
+        if job.n_tasks == job.n_running:
+            self._reconfigure_interconnect(request.job_id)
 
         return sdnmpi_pb2.Empty()
 
@@ -142,7 +167,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         process.state = ProcessState.COMPLETE.value
         process.save()
 
-        logger.info("Process %d of job %d finished", request.rank,
+        logger.info("Process %d of job %d exited", request.rank,
                     request.job_id)
 
         return sdnmpi_pb2.Empty()
