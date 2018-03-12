@@ -1,12 +1,21 @@
 from logging import getLogger
 
+import networkx
+
 from . import sdnmpi_pb2, sdnmpi_pb2_grpc
-from .models import Job, JobState, Process, ProcessState
+from .interconnect_manager import InterconnectManager
+from .models import Job, JobState, Process, ProcessState, db
 
 logger = getLogger(__name__)
 
 
 class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
+    def __init__(self):
+        self.graph = networkx.read_graphml("milk.graphml")
+        self.im = InterconnectManager(self.graph)
+
+        self.im.startup()
+
     def ListJob(self, request, context):
         resp = sdnmpi_pb2.ListJobResponse()
 

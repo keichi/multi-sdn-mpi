@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 def serve():
-    server = grpc.server(ThreadPoolExecutor(max_workers=10))
-    add_SDNMPIServicer_to_server(SDNMPIServicer(), server)
+    server = grpc.server(ThreadPoolExecutor(max_workers=1))
+    servicer = SDNMPIServicer()
+    add_SDNMPIServicer_to_server(servicer, server)
     server.add_insecure_port(GRPC_SERVER_ADDRESS)
     server.start()
 
