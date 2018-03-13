@@ -98,17 +98,23 @@ class InterconnectManager:
         requests.delete(RYU_API_URL + "/stats/flowentry/clear/" + str(dpid))
 
     def _query_flow_stats(self, dpid, cookie):
-        payload = {
-            "cookie": cookie
-        }
-        r = requests.post(RYU_API_URL + "/stats/aggregateflow/" + str(dpid),
-                          json=payload)
+        r = requests.post(RYU_API_URL + "/stats/flow/" + str(dpid))
 
-        stats = r.json()[str(dpid)][0]
+        packet_count = 0
+        byte_count = 0
+        flow_count = 0
+
+        for stats in r.json()[str(dpid)]:
+            if stats["cookie"] != cookie:
+                continue
+
+            packet_count += stats["packet_count"]
+            byte_count += stats["byte_count"]
+            flow_count += 1
 
         logger.info("Job %d consumed %d packets, %d bytes, %d flows"
-                    " on datapath %d", cookie, stats["packet_count"],
-                    stats["byte_count"], stats["flow_count"], dpid)
+                    " on datapath %d", cookie, packet_count, byte_count,
+                    flow_count, dpid)
 
     def _remove_unicast_flows(self, dpid, cookie):
         payload = {
