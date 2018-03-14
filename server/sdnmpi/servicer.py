@@ -1,11 +1,13 @@
 from itertools import product
 from logging import getLogger
+import math
 
 import networkx
 
 from . import sdnmpi_pb2, sdnmpi_pb2_grpc
 from .interconnect_manager import InterconnectManager
-from .models import Job, JobState, Process, ProcessState, db
+from .models import CommPair, CommPattern, Job, JobState, Process,\
+    ProcessState, db
 
 logger = getLogger(__name__)
 
@@ -13,8 +15,12 @@ logger = getLogger(__name__)
 class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
     def __init__(self):
         self.graph = networkx.read_graphml("milk.graphml")
-        self.im = InterconnectManager(self.graph)
 
+        for u, v in self.graph.edges:
+            self.graph.edges[u, v]["traffic"] = 0
+            self.graph.edges[u, v]["alloc"] = {}
+
+        self.im = InterconnectManager(self.graph)
         self.im.startup()
 
     def ListJob(self, request, context):
@@ -129,28 +135,68 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
         return sdnmpi_pb2.Empty()
 
-    def _prepare_interconnect(self, job_id):
-        logger.info("Preparing interconnect for job %d", job_id)
+    def _compute_routing_greedy(self, job, pattern):
+        mapping = {}
+        for proc in job.processes:
+            mapping[proc.rank] = proc.node_name
 
-        procs = Process.select().where(Process.job_id == job_id)
+        routing = {}
+        for pair in pattern.pairs.order_by(CommPair.tx_bytes):
+            src = mapping[pair.src]
+            dst = mapping[pair.dst]
 
-        hosts = {proc.node_name for proc in procs}
-        paths = {}
+            if (src, dst) in routing:
+                path = routing[src, dst]
+            else:
+                paths = list(networkx.all_shortest_paths(self.graph, src, dst))
+                min_path = paths[0]
+                min_cost = math.inf
 
-        for (src, dst) in product(hosts, hosts):
-            path = networkx.shortest_path(self.graph, src, dst)
-            paths[(src, dst)] = path
+                for path in paths:
+                    cost = 0
 
-        self.im.prepare_for_job(job_id, paths)
+                    for u, v in zip(path[:-1], path[1:]):
+                        cost += self.graph.edges[u, v]["traffic"]
 
-        logger.info("Prepared interconnect for job %d", job_id)
+                    if cost < min_cost:
+                        min_path = path
+                        min_cost = cost
 
-    def _cleanup_interconnect(self, job_id):
-        logger.info("Cleaning up interconnect for job %d", job_id)
+                path = min_path
+                routing[src, dst] = path
 
-        self.im.cleanup_for_job(job_id)
+            for u, v in zip(path[1:-1], path[2:-1]):
+                self.graph.edges[u, v]["traffic"] += pair.tx_bytes
+                self.graph.edges[u, v]["alloc"][job.id] = pair.tx_bytes
 
-        logger.info("Cleaned up interconnect for job %d", job_id)
+        return routing
+
+    def _prepare_interconnect(self, job):
+        logger.info("Preparing interconnect for job %d", job.id)
+
+        pattern = CommPattern.get_or_none(CommPattern.name == job.comm_pattern)
+        if not pattern:
+            logger.info("Skipping reconfiguration for job %d since"
+                        " communication pattern is unknown", job.id)
+            return
+
+        routing = self._compute_routing_greedy(job, pattern)
+        self.im.prepare_for_job(job.id, routing)
+
+        logger.info("Prepared interconnect for job %d", job.id)
+
+    def _cleanup_interconnect(self, job):
+        logger.info("Cleaning up interconnect for job %d", job.id)
+
+        for u, v, alloc in self.graph.edges.data("alloc", default={}):
+            if job.id not in alloc:
+                continue
+
+            self.graph.edges[u, v]["traffic"] -= alloc[job.id]
+
+        self.im.cleanup_for_job(job.id)
+
+        logger.info("Cleaned up interconnect for job %d", job.id)
 
     def StartProcess(self, request, context):
         with db.atomic():
@@ -169,7 +215,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
                      request.job_id)
 
         if job.n_started == job.n_tasks:
-            self._prepare_interconnect(request.job_id)
+            self._prepare_interconnect(job)
 
         return sdnmpi_pb2.Empty()
 
@@ -190,6 +236,6 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
                      request.job_id)
 
         if job.n_exited == job.n_tasks:
-            self._cleanup_interconnect(request.job_id)
+            self._cleanup_interconnect(job)
 
         return sdnmpi_pb2.Empty()

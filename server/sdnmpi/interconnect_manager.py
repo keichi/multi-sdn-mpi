@@ -20,10 +20,10 @@ class InterconnectManager:
         self.switches = [n for n, d in graph.nodes.items()
                          if d["typ"] == "switch"]
 
-    def prepare_for_job(self, job_id, paths):
+    def prepare_for_job(self, job_id, routing):
         cookie = job_id
 
-        for (src, dst), path in paths.items():
+        for (src, dst), path in routing.items():
             if src == dst:
                 continue
 
@@ -54,12 +54,35 @@ class InterconnectManager:
             self._clear_flows(dpid)
         logger.info("Cleared flow tables")
 
+        addrs = {host: i for i, host in enumerate(self.hosts)}
+
         # Install flows for all host pairs
         for (src, dst) in product(self.hosts, self.hosts):
             if src == dst:
                 continue
 
             path = networkx.shortest_path(self.graph, src, dst)
+
+            paths = list(networkx.all_shortest_paths(self.graph, src, dst))
+            indices = list(range(len(paths)))
+
+            for i in range(len(paths[0])):
+                # Path decided
+                if len(indices) == 1:
+                    break
+
+                switches = sorted(list({paths[j][i] for j in indices}))
+
+                # Only single option, skipping to next switch in path
+                if len(switches) == 1:
+                    continue
+
+                switch = switches[addrs[dst] % len(switches)]
+
+                indices = [j for j in indices if paths[j][i] == switch]
+
+            path = paths[indices.pop()]
+
             src_mac = self._get_mac(src)
             dst_mac = self._get_mac(dst)
 
