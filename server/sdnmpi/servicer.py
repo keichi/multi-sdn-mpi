@@ -1,6 +1,5 @@
-from itertools import product
-from logging import getLogger
 import math
+from logging import getLogger
 
 import networkx
 

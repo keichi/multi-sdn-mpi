@@ -7,7 +7,8 @@ import requests
 
 
 RYU_API_URL = "http://localhost:8080"
-MIN_PRIO = 32768
+DEFAULT_PRIO = 32768
+JOB_PRIO = DEFAULT_PRIO + 100
 
 logger = getLogger(__name__)
 
@@ -36,7 +37,7 @@ class InterconnectManager:
 
                 self._install_unicast_flow(dpid, src_mac, dst_mac, out_port,
                                            cookie=cookie,
-                                           priority=MIN_PRIO + 100)
+                                           priority=JOB_PRIO)
 
     def cleanup_for_job(self, job_id):
         cookie = job_id
@@ -121,7 +122,7 @@ class InterconnectManager:
         requests.delete(RYU_API_URL + "/stats/flowentry/clear/" + str(dpid))
 
     def _query_flow_stats(self, dpid, cookie):
-        r = requests.post(RYU_API_URL + "/stats/flow/" + str(dpid))
+        r = requests.get(RYU_API_URL + "/stats/flow/" + str(dpid))
 
         packet_count = 0
         byte_count = 0
@@ -140,16 +141,24 @@ class InterconnectManager:
                     flow_count, dpid)
 
     def _remove_unicast_flows(self, dpid, cookie):
-        payload = {
-            "dpid": dpid,
-            "cookie": cookie
-        }
-        r = requests.post(RYU_API_URL + "/stats/flowentry/delete_strict",
-                          json=payload)
+        r = requests.get(RYU_API_URL + "/stats/flow/" + str(dpid))
         r.raise_for_status()
 
+        for stats in r.json()[str(dpid)]:
+            if stats["cookie"] != cookie:
+                continue
+
+            payload = {
+                "dpid": dpid,
+                "priority": JOB_PRIO,
+                "match": stats["match"]
+            }
+            r = requests.post(RYU_API_URL + "/stats/flowentry/delete_strict",
+                              json=payload)
+            r.raise_for_status()
+
     def _install_unicast_flow(self, dpid, src_mac, dst_mac, out_port,
-                              cookie=None, priority=MIN_PRIO):
+                              cookie=None, priority=DEFAULT_PRIO):
         payload = {
             "dpid": dpid,
             "match": {
