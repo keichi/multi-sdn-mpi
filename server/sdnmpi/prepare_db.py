@@ -12,11 +12,29 @@ MODELS = [
 ]
 
 PATTERN_NAMES = [
+    "cg-c-8",
+    "cg-c-16",
+    "cg-c-32",
+    "cg-c-64",
     "cg-c-128",
+    "ft-d-8",
+    "ft-d-16",
+    "ft-d-32",
     "ft-c-128",
-    "milc-128",
-    "openfoam-cavity-160",
-    "openfoam-dambreak-160"
+    "minife-small-128",
+    "minife-small-160",
+    "minife-tiny-16",
+    "minife-tiny-32",
+    "minife-tiny-64",
+    "minife-tiny-128",
+    "minife-tiny-160",
+    "minighost-small-128",
+    "minighost-small-160",
+    "minighost-tiny-16",
+    "minighost-tiny-32",
+    "minighost-tiny-64",
+    "minighost-tiny-128",
+    "minighost-tiny-160",
 ]
 
 
@@ -58,6 +76,8 @@ def _load_tarball(f, pattern):
 
 def _load_fixtures():
     for name in PATTERN_NAMES:
+        print("Loading", name)
+
         pattern = CommPattern.create(name=name)
 
         with open("fixtures/" + name + ".tar.gz", "rb") as f:
