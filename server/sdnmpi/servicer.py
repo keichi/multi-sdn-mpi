@@ -1,4 +1,5 @@
 import math
+from collections import defaultdict
 from logging import getLogger
 
 import networkx
@@ -135,38 +136,43 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         return sdnmpi_pb2.Empty()
 
     def _compute_routing_greedy(self, job, pattern):
-        mapping = {}
-        for proc in job.processes:
-            mapping[proc.rank] = proc.node_name
+        mapping = {proc.rank: proc.node_name for proc in job.processes}
 
-        routing = {}
-        for pair in pattern.pairs.order_by(CommPair.tx_bytes):
+        host_tm = defaultdict(lambda: 0)
+        for pair in pattern.pairs:
             src = mapping[pair.src]
             dst = mapping[pair.dst]
+            host_tm[src, dst] += pair.tx_bytes
 
-            if (src, dst) in routing:
-                path = routing[src, dst]
-            else:
-                paths = list(networkx.all_shortest_paths(self.graph, src, dst))
-                min_path = paths[0]
-                min_cost = math.inf
+        host_adj_list = list(host_tm.items())
+        host_adj_list.sort(key=lambda x: x[1], reverse=True)
 
-                for path in paths:
-                    cost = 0
+        routing = {}
+        for (src, dst), traffic in host_adj_list:
+            paths = list(networkx.all_shortest_paths(self.graph, src, dst))
+            min_path = paths[0]
+            min_cost = math.inf
 
-                    for u, v in zip(path[:-1], path[1:]):
-                        cost += self.graph.edges[u, v]["traffic"]
+            for path in paths:
+                cost = 0
 
-                    if cost < min_cost:
-                        min_path = path
-                        min_cost = cost
+                for u, v in zip(path[:-1], path[1:]):
+                    cost += self.graph.edges[u, v]["traffic"]
 
-                path = min_path
-                routing[src, dst] = path
+                if cost < min_cost:
+                    min_path = path
+                    min_cost = cost
+
+            path = min_path
+            routing[src, dst] = path
 
             for u, v in zip(path[1:-1], path[2:-1]):
-                self.graph.edges[u, v]["traffic"] += pair.tx_bytes
-                self.graph.edges[u, v]["alloc"][job.id] = pair.tx_bytes
+                self.graph.edges[u, v]["traffic"] += traffic
+
+                if job.id not in self.graph.edges[u, v]["alloc"]:
+                    self.graph.edges[u, v]["alloc"][job.id] = 0
+
+                self.graph.edges[u, v]["alloc"][job.id] += traffic
 
         return routing
 
