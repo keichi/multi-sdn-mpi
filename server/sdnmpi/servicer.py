@@ -211,7 +211,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             process.save()
 
             Job.update(n_started=Job.n_started + 1) \
-               .where(id == request.job_id) \
+               .where(Job.id == request.job_id) \
                .execute()
 
         job = Job.get_by_id(request.job_id)
@@ -232,7 +232,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             process.save()
 
             Job.update(n_exited=Job.n_exited + 1) \
-               .where(id == request.job_id) \
+               .where(Job.id == request.job_id) \
                .execute()
 
         job = Job.get_by_id(request.job_id)

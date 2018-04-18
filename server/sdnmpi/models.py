@@ -1,7 +1,7 @@
 from enum import Enum
 
+from peewee import CharField, ForeignKeyField, IntegerField
 from peewee import Model, SqliteDatabase
-from peewee import CharField, IntegerField, ForeignKeyField
 
 db = SqliteDatabase("sdnmpi.db")
 
