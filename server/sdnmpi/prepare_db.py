@@ -21,6 +21,11 @@ PATTERN_NAMES = [
     "ft-d-16",
     "ft-d-32",
     "ft-c-128",
+    "lu-c-8",
+    "lu-c-16",
+    "lu-c-32",
+    "lu-c-64",
+    "lu-c-128",
     "minife-small-128",
     "minife-small-160",
     "minife-tiny-16",
@@ -35,6 +40,12 @@ PATTERN_NAMES = [
     "minighost-tiny-64",
     "minighost-tiny-128",
     "minighost-tiny-160",
+    "stencil2d-16",
+    "stencil2d-32",
+    "stencil2d-64",
+    "stencil2d-160",
+    "stencil3d-128",
+    "stencil3d-160",
 ]
 
 
