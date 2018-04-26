@@ -26,6 +26,15 @@ PATTERN_NAMES = [
     "lu-c-32",
     "lu-c-64",
     "lu-c-128",
+    "ep-c-32",
+    "ep-c-64",
+    "ep-c-128",
+    "is-c-32",
+    "is-c-64",
+    "is-c-128",
+    "mg-c-32",
+    "mg-c-64",
+    "mg-c-128",
     "minife-small-128",
     "minife-small-160",
     "minife-tiny-16",
@@ -46,6 +55,12 @@ PATTERN_NAMES = [
     "stencil2d-160",
     "stencil3d-128",
     "stencil3d-160",
+    "butterfly-32",
+    "butterfly-64",
+    "butterfly-128",
+    "spmv-32",
+    "spmv-64",
+    "spmv-128"
 ]
 
 
