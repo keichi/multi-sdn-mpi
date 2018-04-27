@@ -21,12 +21,16 @@ class InterconnectManager:
                       if d["typ"] == "host"]
         self.switches = [n for n, d in graph.nodes.items()
                          if d["typ"] == "switch"]
+        self.default_routing = {}
 
     def prepare_for_job(self, job_id, routing):
         cookie = job_id
 
         for (src, dst), path in routing.items():
             if src == dst:
+                continue
+
+            if self.default_routing[src, dst] == path:
                 continue
 
             src_mac = self._get_mac(src)
@@ -88,6 +92,8 @@ class InterconnectManager:
                 indices = [j for j in indices if paths[j][i] == switch]
 
             path = paths[indices.pop()]
+
+            self.default_routing[src, dst] = path
 
             src_mac = self._get_mac(src)
             dst_mac = self._get_mac(dst)
