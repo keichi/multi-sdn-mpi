@@ -1,4 +1,5 @@
 import math
+import time
 from collections import defaultdict
 from logging import getLogger
 
@@ -6,8 +7,7 @@ import networkx
 
 from . import sdnmpi_pb2, sdnmpi_pb2_grpc
 from .interconnect_manager import InterconnectManager
-from .models import CommPair, CommPattern, Job, JobState, Process,\
-    ProcessState, db
+from .models import CommPattern, Job, JobState, Process, ProcessState, db
 
 logger = getLogger(__name__)
 
@@ -181,6 +181,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
     def _prepare_interconnect(self, job):
         logger.info("Preparing interconnect for job %d", job.id)
 
+        t0 = time.perf_counter()
+
         pattern = CommPattern.get_or_none(CommPattern.name == job.comm_pattern)
         if not pattern:
             logger.info("Skipping reconfiguration for job %d since"
@@ -188,12 +190,21 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
             return
 
         routing = self._compute_routing_greedy(job, pattern)
+
+        t1 = time.perf_counter()
+
         self.im.prepare_for_job(job.id, routing)
 
-        logger.info("Prepared interconnect for job %d", job.id)
+        t2 = time.perf_counter()
+
+        logger.info("Prepared interconnect for job %d"
+                    " (routing: %lf [s], install: %lf [s])", job.id,
+                    t1 - t0, t2 - t0)
 
     def _cleanup_interconnect(self, job):
         logger.info("Cleaning up interconnect for job %d", job.id)
+
+        t0 = time.perf_counter()
 
         for u, v, alloc in self.graph.edges.data("alloc", default={}):
             if job.id not in alloc:
@@ -203,7 +214,10 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
         self.im.cleanup_for_job(job.id)
 
-        logger.info("Cleaned up interconnect for job %d", job.id)
+        t1 = time.perf_counter()
+
+        logger.info("Cleaned up interconnect for job %d"
+                    " (%lf [s])", job.id, t1 - t0)
 
     def StartProcess(self, request, context):
         with db.atomic():
