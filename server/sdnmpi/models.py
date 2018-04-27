@@ -1,6 +1,6 @@
 from enum import Enum
 
-from peewee import CharField, ForeignKeyField, IntegerField
+from peewee import CharField, FloatField, ForeignKeyField, IntegerField
 from peewee import Model, SqliteDatabase
 
 db = SqliteDatabase("sdnmpi.db")
@@ -53,6 +53,7 @@ class Process(BaseModel):
 
 class CommPattern(BaseModel):
     name = CharField(index=True)
+    duration = FloatField()
 
     class Meta:
         table_name = "comm_pattern"

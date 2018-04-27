@@ -37,6 +37,8 @@ def _load_json(f, pattern):
     n_procs = trace["n_procs"]
     src = trace["rank"]
 
+    pattern.duration = max(pattern.duration, trace["duration"])
+
     for dst in range(n_procs):
         tx_messages = trace["tx_messages"][dst]
         rx_messages = trace["rx_messages"][dst]
@@ -56,6 +58,8 @@ def _load_json(f, pattern):
             rx_messages=rx_messages
         )
 
+    pattern.save()
+
 
 def _load_tarball(f, pattern):
     with tarfile.open(fileobj=f, mode="r:*") as tar:
@@ -71,7 +75,7 @@ def _load_fixtures():
     for name in PATTERN_NAMES:
         print("Loading", name)
 
-        pattern = CommPattern.create(name=name)
+        pattern = CommPattern.create(name=name, duration=0.0)
 
         with open("fixtures/" + name + ".tar.gz", "rb") as f:
             _load_tarball(f, pattern)

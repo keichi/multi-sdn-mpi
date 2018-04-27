@@ -148,7 +148,7 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         host_adj_list.sort(key=lambda x: x[1], reverse=True)
 
         routing = {}
-        for (src, dst), traffic in host_adj_list:
+        for (src, dst), tx_bytes in host_adj_list:
             paths = list(networkx.all_shortest_paths(self.graph, src, dst))
             min_path = paths[0]
             min_cost = math.inf
@@ -165,6 +165,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
 
             path = min_path
             routing[src, dst] = path
+
+            traffic = int(tx_bytes / pattern.duration)
 
             for u, v in zip(path[1:-1], path[2:-1]):
                 self.graph.edges[u, v]["traffic"] += traffic
