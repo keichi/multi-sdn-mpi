@@ -15,6 +15,7 @@ PATTERN_NAMES = [
     "stencil2d-32",
     "stencil2d-64",
     "stencil2d-128",
+    "stencil2d-160",
     "stencil3d-32",
     "stencil3d-64",
     "stencil3d-100",
