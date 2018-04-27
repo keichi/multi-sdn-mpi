@@ -139,9 +139,17 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         mapping = {proc.rank: proc.node_name for proc in job.processes}
 
         host_tm = defaultdict(lambda: 0)
+        total_tx_bytes = 0
+        dilation = 0.0
         for pair in pattern.pairs:
             src = mapping[pair.src]
             dst = mapping[pair.dst]
+
+            total_tx_bytes += pair.tx_bytes
+
+            if src == dst:
+                continue
+
             host_tm[src, dst] += pair.tx_bytes
 
         host_adj_list = list(host_tm.items())
@@ -150,6 +158,10 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
         routing = {}
         for (src, dst), tx_bytes in host_adj_list:
             paths = list(networkx.all_shortest_paths(self.graph, src, dst))
+
+            path_len = networkx.shortest_path_length(self.graph, src, dst)
+            dilation += (path_len - 1) * tx_bytes / total_tx_bytes
+
             min_path = paths[0]
             min_cost = math.inf
 
@@ -175,6 +187,8 @@ class SDNMPIServicer(sdnmpi_pb2_grpc.SDNMPIServicer):
                     self.graph.edges[u, v]["alloc"][job.id] = 0
 
                 self.graph.edges[u, v]["alloc"][job.id] += traffic
+
+        logger.info("Average dilation for job %d is %lf", job.id, dilation)
 
         return routing
 
