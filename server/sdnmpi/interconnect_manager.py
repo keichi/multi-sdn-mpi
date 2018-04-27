@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from itertools import product
 from logging import getLogger
 
@@ -39,14 +40,18 @@ class InterconnectManager:
                                            cookie=cookie,
                                            priority=JOB_PRIO)
 
+    def _cleanup_switch(self, switch, cookie):
+        dpid = self._get_dpid(switch)
+
+        self._query_flow_stats(dpid, cookie)
+        self._remove_unicast_flows(dpid, cookie)
+
     def cleanup_for_job(self, job_id):
         cookie = job_id
 
-        for switch in self.switches:
-            dpid = self._get_dpid(switch)
-
-            self._query_flow_stats(dpid, cookie)
-            self._remove_unicast_flows(dpid, cookie)
+        with ThreadPoolExecutor() as executor:
+            for switch in self.switches:
+                executor.submit(self._cleanup_switch, switch, cookie)
 
     def startup(self):
         # Clear flow tables
